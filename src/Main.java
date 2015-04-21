@@ -25,19 +25,21 @@ public class Main {
 		
 		while(!isValidExpression)
 		{
-			/*System.out.println("Veuillez entrer vos contraintes à la forme \"3X1 + 1X2 <= 30\".");
+			System.out.println("Veuillez entrer vos contraintes à la forme \"3X1 + 1X2 <= 30\".");
 			System.out.println("Entrez les à la suite, valider chacunes aves la touche ENTRER:");
-			*/
-			//String contrainte = "empty";
+			
+			String contrainte = "empty";
 			ArrayList<String> contraintes = new ArrayList<String>();
 			
+			//Utilisé pour tester sans intéraction utilisateur.
+			 /*
 			contraintes.add("2X1+1X2<=90");
 			contraintes.add("3X1+1X2>=60");
 			contraintes.add("3X1+6X2>=180");
 			contraintes.add("2X1+2X2<=140");
 			String fonctionEconomique = "6X1+5X2";
 			
-			/*contraintes.add("5X1+3X2<=30");
+			contraintes.add("5X1+3X2<=30");
 			contraintes.add("2X1+3X2<=24");
 			contraintes.add("1X1+3X2<=18");
 			String fonctionEconomique = "8X1+6X2";
@@ -48,7 +50,8 @@ public class Main {
 			contraintes.add("1X1+1X2+1X3<=45");
 			String fonctionEconomique = "200X1+300X2+225X3";
 			*/
-			/*//L'utilisateur peut entrer 'n' contraintes.
+			
+			//L'utilisateur peut entrer 'n' contraintes.
 			while(!contrainte.equals(""))
 			{
 				contrainte = sc.nextLine();
@@ -63,7 +66,7 @@ public class Main {
 			System.out.println("Veuillez entrer votre fonction économique à la forme \"8X1 + 6X2\".");
 			String fonctionEconomique = sc.nextLine();
 			
-			//Transformation des entrées de l'utlisateur en données exploitables par Simplex.*/
+			//Transformation des entrées de l'utlisateur en données exploitables par Simplex.
 			contraintesAdapter = new ConstraintAdapter(contraintes, fonctionEconomique);
 			valeursBase = contraintesAdapter.valeursBase;
 			matriceInfo = contraintesAdapter.matriceInfo;
@@ -81,29 +84,33 @@ public class Main {
 		afficherMatriceCourrante();
 		System.out.println();
 		
+		//Lancement de simplex.
 		lancerSimplex();
 		
-		//Il y a des ecarts négatifs, on vient de faire le programme auxiliaire
+		//Il y a des ecarts négatifs, on vient donc de résoudre le programme auxiliaire
 		if(contraintesAdapter.isEcartsNegatifs)
 		{
+			//Supprimer les variables Y introduites en amont
 			supprimerlesY();
 			
 			nbTours = 0;
-			valeursHorsBase[3] = new Float(1.4);
-			valeursHorsBase[4] = new Float(0.58);
-			negativeZ = -192;
+			//Supprimes les champs correspondants aux variables Y dans les VHB
+			recalculerValeursHorsBase();
+			
 			System.out.println("Nouveau Simplex après programme auxiliaire");
 			afficherMatriceCourrante();
 			System.out.println();
 			
+			//Exécution de simplex après le lancement du programme auxiliaire.
 			lancerSimplex();
 		}
 		
 
 		//Affichage du résultat final.
-		System.out.println("Resultat: Z = " + (negativeZ*-1));
+		System.out.println("Resultat: Z = " + Math.ceil(negativeZ*-1));
 	}
 	
+	//Execute l'algorithme simplex sur la matrice courrante.
 	public static void lancerSimplex()
 	{
 		//La boucle continue tant qu'il reste des variables hors bases positives.
@@ -286,14 +293,16 @@ public class Main {
 		{
 			System.out.print(df.format(valeursHorsBase[i]) + " ");
 		}
-		System.out.println("|  |" + (negativeZ) + "|");
+		System.out.println("|  |" + Math.floor(negativeZ) + "|");
 	}
 	
-	//Supprime les variables Y1, Y2, ...
+	//Supprime les variables Y1, Y2, ... (Utilisé après éxécution du programme auxiliaire)
 	public static void supprimerlesY()
 	{
 		for(int i = 0; i < matriceInfo.length;i++)
 		{
+			//Si la colonne contient Y, on doit recréer une matrice en suppriment toute la partie 
+			//droite, en partant de la valeur Y trouvé.
 			if(matriceInfo[i].contains("Y"))
 			{
 				float[][] nouvelleMatrice = new float[matrice.length][i];
@@ -322,6 +331,52 @@ public class Main {
 		
 		matriceInfo = newMatriceInfo;
 		valeursHorsBase = newVHB;
+		
+	}
+	
+	//Réduire la le tableaux des VHB car les variables Yx on été supprimés.
+	public static void recalculerValeursHorsBase()
+	{
+		//Remettre les variable à 0.
+		valeursHorsBase = new float[valeursHorsBase.length];
+		negativeZ = 0;
+		
+		//pour chaques ValeurBase
+		for(int i = 0; i<valeursBase.length;i++)
+		{
+			//Elle correspond à Xx, donc on va s'en servir pour calculer les nouvelles VHB.
+			if(valeursBase[i].contains("X"))
+			{
+				float coefficient = getCoefficient(valeursBase[i]);
+				for(int j = 0; j < matriceInfo.length;j++)
+				{
+					if(matriceInfo[j].contains("E"))
+					{
+						//Calculs de la nouvelle VHB avec coefficient de la fonction économique.
+						valeursHorsBase[j] -= matrice[i][j]*coefficient;
+					}
+					
+				}
+				
+				//Calcul du nouveau z de départ avec coefficient de la fonction économique.
+				negativeZ -= valeursSolutions[i] * coefficient;
+			}
+		}
+		
+	}
+	
+	//prend en paramètre X1, X2, ...
+	//Donne la valeur de ce X en fonction de la fonction économique (ex: 6X1+5X2) X1 = 6
+	public static float getCoefficient(String xValue)
+	{
+		String[] fonctionEconomique = contraintesAdapter.fonctionEconomique.split("\\+");
+		for(int i = 0;i<fonctionEconomique.length;i++)
+		{
+			if(fonctionEconomique[i].contains(xValue))
+				return new Float(fonctionEconomique[i].split("X")[0]);
+		}
+		
+		return new Float(0);
 		
 	}
 }

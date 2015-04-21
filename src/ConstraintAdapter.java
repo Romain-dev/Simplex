@@ -18,8 +18,11 @@ public class ConstraintAdapter {
 	public boolean isValid = true;
 	public int nbAgrandissement = 1;
 	public float z = 0;
+	
+	//Nombre de variables du problème initial.
 	public int nbVariables = 0;
 	
+	//Contient des écarts négatifs dans les contraintes (ex 6X1+2X2 >= 200 ==> 6X1+2X2-E1=200).
 	public boolean isEcartsNegatifs = false;
 	
 	public ConstraintAdapter(ArrayList<String> contraintes,String fonctionEconomique) 
@@ -35,6 +38,8 @@ public class ConstraintAdapter {
 			construireValeursHorsBaseEtMatriceInfo();
 			nbVariables = matriceInfo.length - valeursBase.length;
 			construireMatriceEtValeursSolution();
+			
+			//Si il y a des écarts négatifs
 			if(isEcartsNegatifs)
 			{
 				mettreAjourFonctionEconomique();
@@ -100,7 +105,7 @@ public class ConstraintAdapter {
 			String contrainte = contraintes.get(i);
 			contrainte = contrainte.replace(" ", "");
 			
-			//Il faut introduire des variables Yx.
+			//Il faut introduire des variables Yx car il y a des variables négatives dans cette contrainte.
 			if(contrainte.contains(">="))
 			{
 				isEcartsNegatifs = true;
@@ -121,6 +126,8 @@ public class ConstraintAdapter {
 					matrice[i][getIndexOfXxVal("X" + element[1])] = new Float(element[0]);
 				}
 				  
+				//Traitement spécifique au fait qu'il y ait des variables négatives.
+				//Introduction d'une variable Y.
 				agrandirMatriceInfo("Y");
 				agrandirFonctionEconomique();
 				elargirMatrice(i);
@@ -171,6 +178,7 @@ public class ConstraintAdapter {
 		return index;
 	}
 	
+	//Agrandir la variables MatriceInfo avec une variable de type Yx passé en paramètre.
 	public void agrandirMatriceInfo(String element)
 	{
 		String[] nouvelleMatriceInfo = new String[matriceInfo.length+1];
@@ -184,6 +192,7 @@ public class ConstraintAdapter {
 		matriceInfo = nouvelleMatriceInfo;
 	}
 	
+	//Ajoute une case vide (0) en fin de la fonction économique.
 	public void agrandirFonctionEconomique()
 	{
 		float[] nouvelleVHB = new float[valeursHorsBase.length+1];
@@ -197,9 +206,11 @@ public class ConstraintAdapter {
 		valeursHorsBase = nouvelleVHB;	
 	}
 	
+	//Ajouter une colonne du cotès droit de la matrice pour introduire une nouvelle variable.
 	public void elargirMatrice(int derniereLigneIndex)
 	{
 		float[][] nouvelleMatrice = new float[matrice.length][matrice[0].length+1];
+		//Copie de la matrice en plus grand.
 		for(int i = 0;i<matrice.length;i++)
 		{
 			for(int j = 0;j<matrice[0].length;j++)
@@ -208,15 +219,20 @@ public class ConstraintAdapter {
 			}
 		}
 		
+		//On afffecte la valeur de Y pour cette ligne à 1.
 		nouvelleMatrice[derniereLigneIndex][matrice[0].length] = 1;
 		matrice = nouvelleMatrice;
 	}
 	
+	
+	//Redéfinir la fonction économique
 	public void mettreAjourFonctionEconomique()
 	{
 		valeursHorsBase = new float[valeursHorsBase.length];
 		for(int i = 0; i<valeursBase.length; i++)
 		{
+			//Si la ligne de la matrice contient la valeur base Yx, alors on ajoute la ligne de la matrice
+			//à la fonction économique.
 			if(valeursBase[i].contains("Y"))
 			{
 				for(int j=0; j<nbVariables + contraintes.size();j++)
