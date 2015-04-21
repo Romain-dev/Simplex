@@ -16,6 +16,11 @@ public class ConstraintAdapter {
 	public float[] valeursSolutions;
 	public float[] valeursHorsBase;
 	public boolean isValid = true;
+	public int nbAgrandissement = 1;
+	public float z = 0;
+	public int nbVariables = 0;
+	
+	public boolean isEcartsNegatifs = false;
 	
 	public ConstraintAdapter(ArrayList<String> contraintes,String fonctionEconomique) 
 	{
@@ -28,7 +33,12 @@ public class ConstraintAdapter {
 			//Transformation des inéquations.
 			construireValeursBase();
 			construireValeursHorsBaseEtMatriceInfo();
+			nbVariables = matriceInfo.length - valeursBase.length;
 			construireMatriceEtValeursSolution();
+			if(isEcartsNegatifs)
+			{
+				mettreAjourFonctionEconomique();
+			}
 		}
 		catch(Exception e)
 		{
@@ -87,26 +97,61 @@ public class ConstraintAdapter {
 		//pour chaque ligne de la matrice simplex
 		for(int i =0; i<valeursBase.length;i++)
 		{
-			
 			String contrainte = contraintes.get(i);
 			contrainte = contrainte.replace(" ", "");
-			String[] elements = contrainte.split("<=");
 			
-			//on charge la valeur solution.
-			valeursSolutions[i] = new Float(elements[1]);
-			
-			//une contrainte
-			elements = elements[0].split("\\+");
-			
-			//Pour chaques éléments de la contrainte.
-			int x =0;
-			for(x = 0; x < elements.length; x++)
+			//Il faut introduire des variables Yx.
+			if(contrainte.contains(">="))
 			{
-				String[] element = elements[x].split("X");
-				matrice[i][getIndexOfXxVal("X" + element[1])] = new Float(element[0]);
+				isEcartsNegatifs = true;
+				
+				String[] elements = contrainte.split(">=");
+				
+				//on charge la valeur solution.
+				valeursSolutions[i] = new Float(elements[1]);
+				
+				//une contrainte
+				elements = elements[0].split("\\+");
+				
+				//Pour chaques éléments de la contrainte.
+				int x =0;
+				for(x = 0; x < elements.length; x++)
+				{
+					String[] element = elements[x].split("X");
+					matrice[i][getIndexOfXxVal("X" + element[1])] = new Float(element[0]);
+				}
+				  
+				agrandirMatriceInfo("Y");
+				agrandirFonctionEconomique();
+				elargirMatrice(i);
+				valeursHorsBase[i+nbVariables] = -1;
+				valeursBase[i] = "Y"+nbAgrandissement;
+				z += valeursSolutions[i];
+				nbAgrandissement++;
+				
+				matrice[i][getIndexOfXxVal("E"+(i+1))] = -1;
 			}
-			  
-			matrice[i][getIndexOfXxVal("E"+(i+1))] = 1;
+			else
+			{
+				
+				String[] elements = contrainte.split("<=");
+				
+				//on charge la valeur solution.
+				valeursSolutions[i] = new Float(elements[1]);
+				
+				//une contrainte
+				elements = elements[0].split("\\+");
+				
+				//Pour chaques éléments de la contrainte.
+				int x =0;
+				for(x = 0; x < elements.length; x++)
+				{
+					String[] element = elements[x].split("X");
+					matrice[i][getIndexOfXxVal("X" + element[1])] = new Float(element[0]);
+				}
+				  
+				matrice[i][getIndexOfXxVal("E"+(i+1))] = 1;
+			}
 		} 
 	}
 	
@@ -125,4 +170,61 @@ public class ConstraintAdapter {
 		
 		return index;
 	}
+	
+	public void agrandirMatriceInfo(String element)
+	{
+		String[] nouvelleMatriceInfo = new String[matriceInfo.length+1];
+		
+		for(int i = 0; i<matriceInfo.length; i++)
+		{
+			nouvelleMatriceInfo[i] = matriceInfo[i];
+		}
+		
+		nouvelleMatriceInfo[matriceInfo.length] = element + nbAgrandissement;
+		matriceInfo = nouvelleMatriceInfo;
+	}
+	
+	public void agrandirFonctionEconomique()
+	{
+		float[] nouvelleVHB = new float[valeursHorsBase.length+1];
+		
+		for(int i = 0; i<valeursHorsBase.length; i++)
+		{
+			nouvelleVHB[i] = valeursHorsBase[i];
+		}
+		
+		nouvelleVHB[valeursHorsBase.length] = 0;
+		valeursHorsBase = nouvelleVHB;	
+	}
+	
+	public void elargirMatrice(int derniereLigneIndex)
+	{
+		float[][] nouvelleMatrice = new float[matrice.length][matrice[0].length+1];
+		for(int i = 0;i<matrice.length;i++)
+		{
+			for(int j = 0;j<matrice[0].length;j++)
+			{
+				nouvelleMatrice[i][j] = matrice[i][j];
+			}
+		}
+		
+		nouvelleMatrice[derniereLigneIndex][matrice[0].length] = 1;
+		matrice = nouvelleMatrice;
+	}
+	
+	public void mettreAjourFonctionEconomique()
+	{
+		valeursHorsBase = new float[valeursHorsBase.length];
+		for(int i = 0; i<valeursBase.length; i++)
+		{
+			if(valeursBase[i].contains("Y"))
+			{
+				for(int j=0; j<nbVariables + contraintes.size();j++)
+				{
+					valeursHorsBase[j] += matrice[i][j];
+				}
+			}
+		}
+	}
+	
 }
